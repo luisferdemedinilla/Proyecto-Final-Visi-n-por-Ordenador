@@ -1,40 +1,57 @@
-import cv2
 
-def main(camera_index=0, width=1280, height=720):
-    cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)  # Use CAP_DSHOW for Windows to avoid warning messages
+import cv2
+import numpy as np
+
+# Parámetros obtenidos de la calibración
+camera_matrix = np.array([
+    [775.3770952, 0, 367.08087401],
+     [0, 777.943537795, 510.10299332],
+     [0, 0, 1]
+], dtype=np.float64)
+
+dist_coeffs = np.array([1.97599071e-01,  -1.24057799e+00, -3.06253123e-04 ,-3.08980276e-03, 2.83269649e+00], dtype=np.float64)
+
+
+def main(camera_index=1, width=1280, height=720):
+
+    cap = cv2.VideoCapture(camera_index, cv2.CAP_MSMF)
+
     if not cap.isOpened():
-        print(f"Could not open the camera (index {camera_index}).")
+        print("No se pudo abrir la cámara.")
         return
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-    window_name = "Live Camera - press 'q' to quit"
-    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)  # resizable window
-
     try:
         while True:
             ret, frame = cap.read()
+
             if not ret:
-                print("No frame received (the camera may have been disconnected).")
                 break
 
-            # Optional: flip horizontally (mirror), comment out if not desired
+            # Corregir la distorsión de la lente
+            corrected = cv2.undistort(
+                frame,
+                camera_matrix,
+                dist_coeffs
+            )
+
+            # Voltear ambas imágenes (efecto espejo)
             frame = cv2.flip(frame, 1)
+            corrected = cv2.flip(corrected, 1)
 
-            # Display the frame
-            cv2.imshow(window_name, frame)
+            # Mostrar ambas imágenes
+            cv2.imshow("Camara original", frame)
+            cv2.imshow("Camara corregida", corrected)
 
-            # Wait 1 ms for a key; exit with 'q' or ESC
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q') or key == 27:
+            if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-    except KeyboardInterrupt:
-        pass
+
     finally:
         cap.release()
         cv2.destroyAllWindows()
 
+
 if __name__ == "__main__":
-    # If the built-in webcam is not at index 0, change the first argument: main(1)
     main(camera_index=1, width=1280, height=720)
