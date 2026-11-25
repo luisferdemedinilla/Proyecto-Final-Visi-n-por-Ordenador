@@ -48,7 +48,7 @@ class CamaraFrontal:
 
     def __init__(self, modelo, invertir_manos=False,imagen = None, tipo_detectcion = "S"):
         import mediapipe as mp
-        self.threashold = 5
+        self.threashold = 100
         self.mp = mp
         self.invertir_manos = invertir_manos
         self.marcas = calcular_marcas(imagen)
@@ -75,30 +75,87 @@ class CamaraFrontal:
         return False
 
     def procesar(self, imagen, instante_ms):
-        
-        vista = imagen.copy()
-      
 
+        # Corregir la distorsión de la cámara
+
+        vista = imagen.copy()
+
+        # Dibujar la línea de referencia
+        if self.marcas is not None and None not in self.marcas:
+            cv2.line(
+                vista,
+                self.marcas[0],
+                self.marcas[1],
+                (0, 255, 0),
+                2
+            )
+
+        # Detección de manos
         rgb = cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB)
-        entrada = self.mp.Image(image_format=self.mp.ImageFormat.SRGB, data=rgb)
+
+        entrada = self.mp.Image(
+            image_format=self.mp.ImageFormat.SRGB,
+            data=rgb
+        )
+
         resultado = self.manos.detect_for_video(entrada, instante_ms)
+
         alto, ancho = imagen.shape[:2]
-        etiquetas = [categorias[0].category_name for categorias in resultado.handedness]
+
+        etiquetas = [
+            categorias[0].category_name
+            for categorias in resultado.handedness
+        ]
+
         nombres = {"Left": "izquierda", "Right": "derecha"}
+
         if self.invertir_manos:
             nombres = {"Left": "derecha", "Right": "izquierda"}
 
         dedos = {}
+
         for etiqueta, puntos in zip(etiquetas, resultado.hand_landmarks):
+
             if etiquetas.count(etiqueta) != 1 or etiqueta not in nombres:
                 continue
+
             mano = nombres[etiqueta]
-            pixeles = np.float32([(p.x * ancho, p.y * alto) for p in puntos])
+
+            pixeles = np.float32([
+                (p.x * ancho, p.y * alto) for p in puntos
+            ])
+
+            # Dibujar rectángulo alrededor de la mano
+            x, y, w, h = cv2.boundingRect(pixeles)
+
+            cv2.rectangle(
+                vista, (x, y), (x + w, y + h),
+                (200, 160, 0), 1
+            )
+
             for i, dedo in DEDOS.items():
+
                 pixel = tuple(map(int, pixeles[i]))
-  
-                dedos[mano, dedo] = {"pixel": pixel, "toca": self.toca_tecla(pixel)}
-               
+                toca = self.toca_tecla(pixel)
+
+                dedos[mano, dedo] = {
+                    "pixel": pixel,
+                    "toca": toca
+                }
+
+                # Verde si toca, rojo si no toca
+                color = (0, 255, 0) if toca else (0, 0, 255)
+
+                cv2.circle(vista, pixel, 5, color, -1)
+
+                cv2.putText(
+                    vista,
+                    f"{mano[0]}-{dedo[:3]} {toca}",
+                    pixel,
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, color, 1
+                )
+
         return dedos, vista
 
     def cerrar(self):

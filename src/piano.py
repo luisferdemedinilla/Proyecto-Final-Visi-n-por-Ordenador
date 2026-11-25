@@ -7,12 +7,12 @@ class Piano:
         pygame.mixer.init(buffer=512)
         pygame.mixer.set_num_channels(32)
 
-        carpeta = Path(__file__).parent / "sounds"
+        carpeta ="sounds/"
         notas = ["Do4", "Re4", "Mi4", "Fa4",
                  "Sol4", "La4", "Si4", "Do5"]
 
         self.sonidos = {
-            nota: pygame.mixer.Sound(str(carpeta / f"{nota}.wav"))
+            nota: pygame.mixer.Sound(carpeta + f"{nota}.wav")
             for nota in notas
         }
 

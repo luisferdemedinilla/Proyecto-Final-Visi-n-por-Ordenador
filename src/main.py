@@ -1,44 +1,102 @@
-from camara_frontal import *
-from camara_superior import *
-from piano import *
+from camara_frontal import CamaraFrontal
+from camara_superior import CamaraSuperior
+from piano import Piano
+
+from pathlib import Path
+import cv2
+import time
+
 
 def main():
-    camara_frontal = CamaraFrontal("src/hand_landmarker.task")
-    camara_superior = CamaraSuperior("src/hand_landmarker.task")
-    piano = Piano()
 
-    # Cámaras frontal y superior respectivamente
+    modelo = "src/hand_landmarker.task"
+
+    # Abrir las cámaras frontal y superior
     camara = cv2.VideoCapture(0)
     camara_2 = cv2.VideoCapture(1)
 
-    while True:
+    # Configurar resolución de la cámara frontal
+    camara.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+    camara.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+
+    # Configurar resolución de la cámara superior
+    camara_2.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    camara_2.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+    camara_frontal = None
+    camara_superior = None
+
+    try:
+        # Capturar imagen inicial para seleccionar las marcas
         ret, frame = camara.read()
-        ret2, frame2 = camara_2.read()
 
-        if not ret or not ret2:
-            print("Error al capturar la imagen de la cámara.")
-            break
+        if not ret:
+            print("Error al capturar la imagen frontal.")
+            return
 
-        instante = time.monotonic_ns() // 1_000_000
+        # Inicializar los objetos
+        camara_frontal = CamaraFrontal(
+            modelo, imagen=frame
+        )
 
-        dedos_frontal, vista_frontal = camara_frontal.procesar(frame, instante)
-        dedos_superior, vista_superior = camara_superior.procesar(frame2, instante)
+        camara_superior = CamaraSuperior(modelo)
 
-        cv2.imshow("Camara Frontal", vista_frontal)
-        cv2.imshow("Camara Superior", vista_superior)
+        piano = Piano()
 
-        if cv2.waitKey(1) & 0xFF in (27, ord("q")):
-            break
+        while True:
 
-        for (mano, dedo), info in dedos_frontal.items():
-            tecla = info["toca"]
+            ret, frame = camara.read()
+            ret2, frame2 = camara_2.read()
 
-            if tecla:
-                piano.pulsar(mano, dedo, tecla)
-            else:
-                piano.soltar(mano, dedo)
+            if not ret or not ret2:
+                print("Error al capturar la imagen de la cámara.")
+                break
+
+            instante = time.monotonic_ns() // 1_000_000
+
+            dedos_frontal, vista_frontal = camara_frontal.procesar(
+                frame, instante
+            )
+
+            dedos_superior, vista_superior = camara_superior.procesar(
+                frame2, instante
+            )
+
+            cv2.imshow("Camara Frontal", vista_frontal)
+            cv2.imshow("Camara Superior", vista_superior)
+
+            if cv2.waitKey(1) & 0xFF in (27, ord("q")):
+                break
+
+            # Combinar la información de ambas cámaras
+            for (mano, dedo), info in dedos_frontal.items():
+
+                toca = info["toca"]
+
+                info_superior = dedos_superior.get(
+                    (mano, dedo), {}
+                )
+
+                tecla = info_superior.get("tecla")
+
+                if toca and tecla is not None:
+                    piano.pulsar(mano, dedo, tecla)
+                else:
+                    piano.soltar(mano, dedo)
+
+    finally:
+
+        camara.release()
+        camara_2.release()
+
+        if camara_frontal is not None:
+            camara_frontal.cerrar()
+
+        if camara_superior is not None:
+            camara_superior.cerrar()
+
+        cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()
-                
-            
