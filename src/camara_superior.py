@@ -1,5 +1,6 @@
 """Vista superior del piano. Ejecutar con --help para ver las opciones."""
 import argparse
+import os
 from pathlib import Path
 import time
 
@@ -133,7 +134,7 @@ def demo():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plantilla", metavar="PNG", help="crear teclado para imprimir")
     parser.add_argument("--camara", type=int, default=0)
-    parser.add_argument("--modelo", default="hand_landmarker.task")
+    parser.add_argument("--modelo", default="Material Lab_Project/Lab_Project/Proyecto-Final-Visi-n-por-Ordenador/src/hand_landmarker.task")
     parser.add_argument("--calibracion", help="NPZ con camera_matrix y dist_coeffs")
     parser.add_argument("--invertir-manos", action="store_true")
     args = parser.parse_args()
