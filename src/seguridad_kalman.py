@@ -1,5 +1,6 @@
 """Secuencia de teclas mediante MeanShift y filtro de Kalman (apartado D).
 
+Coloca el teclado impreso con al menos tres marcadores ArUco visibles.
 Coloca una marca de color vivo en la punta del dedo. Pulsa S y selecciona
 la marca con el raton; confirma la seleccion con Espacio o Enter.
 """
@@ -8,7 +9,11 @@ import argparse
 import cv2
 import numpy as np
 
-from seguridad_flujo import NOTAS, SECUENCIA, TECLADO, tecla_en
+from camara_superior import (
+    ABAJO, ARRIBA, DERECHA, IZQUIERDA, NOTAS,
+    diccionario, localizar_teclado, tecla_en,
+)
+from seguridad_flujo import SECUENCIA
 
 
 VENTANA = "Seguridad - MeanShift y Kalman"
@@ -31,6 +36,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--camara", type=int, default=1)
     args = parser.parse_args()
+    detector = cv2.aruco.ArucoDetector(diccionario())
     camara = cv2.VideoCapture(args.camara)
     if not camara.isOpened():
         raise RuntimeError("No se pudo abrir la camara")
@@ -49,9 +55,7 @@ def main():
             if not ok:
                 print("La camara ha dejado de entregar imagenes")
                 break
-            alto, ancho = imagen.shape[:2]
-            limites = (int(TECLADO[0] * ancho), int(TECLADO[1] * alto),
-                       int(TECLADO[2] * ancho), int(TECLADO[3] * alto))
+            matriz = localizar_teclado(detector, imagen)
             vista = imagen.copy()
             punto = None
             estado = "Pulsa S y selecciona la marca de color"
@@ -81,19 +85,26 @@ def main():
                     candidato = None
                     estado = "Marca perdida: pulsa S para seleccionarla de nuevo"
 
-            indice = tecla_en(punto, limites) if punto is not None else None
+            nota = None
+            if matriz is None:
+                preparada = False
+                candidato, consecutivos = None, 0
+            elif punto is not None:
+                punto_papel = cv2.perspectiveTransform(np.float32([[punto]]), matriz)
+                nota = tecla_en(*punto_papel[0, 0])
+
             # Tres imagenes consecutivas reducen los cambios por ruido en los bordes.
-            if punto is not None:
-                if indice == candidato:
+            if matriz is not None and punto is not None:
+                if nota == candidato:
                     consecutivos += 1
                 else:
-                    candidato, consecutivos = indice, 1
+                    candidato, consecutivos = nota, 1
                 if consecutivos >= 3:
-                    if indice is None:
+                    if nota is None:
                         preparada = True
                     elif preparada and not completada:
                         preparada = False
-                        if NOTAS[indice] == SECUENCIA[progreso]:
+                        if nota == SECUENCIA[progreso]:
                             progreso += 1
                             error = False
                             completada = progreso == len(SECUENCIA)
@@ -102,17 +113,20 @@ def main():
                             error = True
             if completada:
                 estado = "Secuencia correcta - R para reiniciar"
+            elif matriz is None:
+                estado = "Muestra al menos 3 marcadores del teclado"
             elif error:
                 estado = "Tecla incorrecta: vuelve a empezar"
 
-            izquierda, arriba, derecha, abajo = limites
-            for i, nota in enumerate(NOTAS):
-                x0 = izquierda + i * (derecha - izquierda) // len(NOTAS)
-                x1 = izquierda + (i + 1) * (derecha - izquierda) // len(NOTAS)
-                color = (0, 220, 0) if i == indice else (255, 255, 255)
-                cv2.rectangle(vista, (x0, arriba), (x1, abajo), color, 2)
-                cv2.putText(vista, nota, (x0 + 3, abajo - 8),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+            if nota is not None:
+                ancho_tecla = (DERECHA - IZQUIERDA) / len(NOTAS)
+                x0 = IZQUIERDA + NOTAS.index(nota) * ancho_tecla
+                x1 = x0 + ancho_tecla
+                borde_papel = np.float32([[
+                    (x0, ARRIBA), (x1, ARRIBA), (x1, ABAJO), (x0, ABAJO),
+                ]])
+                borde = cv2.perspectiveTransform(borde_papel, np.linalg.inv(matriz))
+                cv2.polylines(vista, [borde.astype(np.int32)], True, (0, 220, 0), 2)
             for linea, texto in enumerate((estado,
                     f"Secuencia: {progreso}/{len(SECUENCIA)}  |  S: seleccionar  R: reiniciar  Q: salir",
                     "Orden: " + " -> ".join(SECUENCIA))):
