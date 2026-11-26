@@ -13,7 +13,9 @@ from camara_superior import (
     ABAJO, ARRIBA, DERECHA, IZQUIERDA, NOTAS,
     diccionario, localizar_teclado, tecla_en,
 )
-from seguridad_flujo import SECUENCIA
+
+
+SECUENCIA = ["Do4", "Mi4", "Sol4", "Do5"]
 
 
 VENTANA = "Seguridad - MeanShift y Kalman"
