@@ -69,18 +69,14 @@ def main():
                 break
 
             # Combinar la información de ambas cámaras
-            for (mano, dedo), info in dedos_frontal.items():
+            # Ejecutar en cada iteración, después de procesar ambas imágenes.
+            for identidad, datos in dedos_frontal.items():
+                mano, dedo = identidad
+                superior = dedos_superior.get(identidad)
 
-                toca = info["toca"]
-
-                info_superior = dedos_superior.get(
-                    (mano, dedo), {}
-                )
-
-                tecla = info_superior.get("tecla")
-
-                if toca and tecla is not None:
-                    piano.pulsar(mano, dedo, tecla)
+                if datos["toca"]:
+                    if superior is not None and superior["tecla"] is not None:
+                        piano.pulsar(mano, dedo, superior["tecla"])
                 else:
                     piano.soltar(mano, dedo)
 

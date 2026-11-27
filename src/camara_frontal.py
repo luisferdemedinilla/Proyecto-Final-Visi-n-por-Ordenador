@@ -46,13 +46,13 @@ class CamaraFrontal:
     """
 
 
-    def __init__(self, modelo, invertir_manos=False,imagen = None, tipo_detectcion = "S"):
+    def __init__(self, modelo, invertir_manos=False,imagen = None):
         import mediapipe as mp
         self.threashold = 100
         self.mp = mp
         self.invertir_manos = invertir_manos
         self.marcas = calcular_marcas(imagen)
-        self.tipo_detectcion = tipo_detectcion
+        
         vision = mp.tasks.vision
         opciones = vision.HandLandmarkerOptions(
             base_options=mp.tasks.BaseOptions(model_asset_path=str(modelo)),
@@ -64,13 +64,7 @@ class CamaraFrontal:
         if self.marcas is None:
             return False
         x, y = pixel
-        if self.tipo_detectcion == "S":
-            ymax = max(self.marcas[0][1], self.marcas[1][1])
-        elif self.tipo_detectcion == "I":
-            ymax = min(self.marcas[0][1], self.marcas[1][1])
-        else:
-            ymax = (self.marcas[0][1] + self.marcas[1][1]) / 2
-        if  ymax< y < ymax + self.threashold:
+        if self.marcas[0][1] < y < self.marcas[1][1] or self.marcas[1][1] < y < self.marcas[0][1]:  
             return True
         return False
 
@@ -81,15 +75,29 @@ class CamaraFrontal:
         vista = imagen.copy()
 
         # Dibujar la línea de referencia
+        # Dibujar la zona de contacto con relleno transparente
         if self.marcas is not None and None not in self.marcas:
-            cv2.line(
+            capa = vista.copy()
+
+            cv2.rectangle(
+                capa,
+                self.marcas[0],
+                self.marcas[1],
+                (0, 255, 0),
+                -1
+            )
+
+            # 0.2 representa un 20 % de opacidad
+            cv2.addWeighted(capa, 0.2, vista, 0.8, 0, dst=vista)
+
+            # Dibujar el borde
+            cv2.rectangle(
                 vista,
                 self.marcas[0],
                 self.marcas[1],
                 (0, 255, 0),
                 2
             )
-
         # Detección de manos
         rgb = cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB)
 
