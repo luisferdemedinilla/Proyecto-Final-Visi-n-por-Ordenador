@@ -7,12 +7,12 @@ class Piano:
         pygame.mixer.init(buffer=512)
         pygame.mixer.set_num_channels(32)
 
-        carpeta ="sounds/"
+        carpeta = Path(__file__).resolve().parent.parent / "sounds"
         notas = ["Do4", "Re4", "Mi4", "Fa4",
                  "Sol4", "La4", "Si4", "Do5"]
 
         self.sonidos = {
-            nota: pygame.mixer.Sound(carpeta + f"{nota}.wav")
+            nota: pygame.mixer.Sound(str(carpeta / f"{nota}.wav"))
             for nota in notas
         }
 
@@ -25,10 +25,13 @@ class Piano:
         if identidad in self.activos:
             return
 
-        canal = self.sonidos[nota].play()
+        canal = self.reproducir(nota)
 
         if canal is not None:
             self.activos[identidad] = canal
+
+    def reproducir(self, nota):
+        return self.sonidos[nota].play()
 
     def soltar(self, mano, dedo):
         canal = self.activos.pop((mano, dedo), None)
@@ -38,4 +41,3 @@ class Piano:
 
     def cerrar(self):
         pygame.mixer.quit()
-    

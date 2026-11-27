@@ -13,6 +13,7 @@ from camara_superior import (
     ABAJO, ARRIBA, DERECHA, IZQUIERDA, NOTAS,
     diccionario, localizar_teclado, tecla_en,
 )
+from piano import Piano
 
 
 SECUENCIA = ["Do4", "Mi4", "Sol4", "Do5"]
@@ -34,14 +35,9 @@ def crear_filtro(x, y):
     return filtro
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--camara", type=int, default=1)
-    args = parser.parse_args()
+def solicitar_acceso(piano, indice=1):
     detector = cv2.aruco.ArucoDetector(diccionario())
-    camara = cv2.VideoCapture(args.camara)
-    if not camara.isOpened():
-        raise RuntimeError("No se pudo abrir la camara")
+    camara = cv2.VideoCapture(indice)
 
     histograma = ventana = filtro = None
     progreso = 0
@@ -50,13 +46,19 @@ def main():
     error = False
     candidato = None
     consecutivos = 0
-    cv2.namedWindow(VENTANA, cv2.WINDOW_NORMAL)
+    ventana_abierta = False
     try:
+        if not camara.isOpened():
+            raise RuntimeError(f"No se pudo abrir la cámara {indice}")
+        camara.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        camara.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        cv2.namedWindow(VENTANA, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
+        ventana_abierta = True
+        cv2.resizeWindow(VENTANA, 1100, 660)
         while True:
             ok, imagen = camara.read()
             if not ok:
-                print("La camara ha dejado de entregar imagenes")
-                break
+                raise RuntimeError(f"La cámara {indice} ha dejado de entregar imágenes")
             matriz = localizar_teclado(detector, imagen)
             vista = imagen.copy()
             punto = None
@@ -106,6 +108,7 @@ def main():
                         preparada = True
                     elif preparada and not completada:
                         preparada = False
+                        piano.reproducir(nota)
                         if nota == SECUENCIA[progreso]:
                             progreso += 1
                             error = False
@@ -114,7 +117,7 @@ def main():
                             progreso = 0
                             error = True
             if completada:
-                estado = "Secuencia correcta - R para reiniciar"
+                estado = "Acceso autorizado"
             elif matriz is None:
                 estado = "Muestra al menos 3 marcadores del teclado"
             elif error:
@@ -136,8 +139,10 @@ def main():
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
             cv2.imshow(VENTANA, vista)
             tecla = cv2.waitKey(1) & 0xFF
-            if tecla in (27, ord("q")):
-                break
+            if tecla in (27, ord("q")) or cv2.getWindowProperty(VENTANA, cv2.WND_PROP_VISIBLE) < 1:
+                return False
+            if completada:
+                return True
             if tecla == ord("r"):
                 progreso, preparada, completada, error = 0, False, False, False
                 candidato, consecutivos = None, 0
@@ -158,7 +163,19 @@ def main():
                     candidato, consecutivos = None, 0
     finally:
         camara.release()
-        cv2.destroyAllWindows()
+        if ventana_abierta:
+            cv2.destroyAllWindows()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--camara", type=int, default=1)
+    args = parser.parse_args()
+    piano = Piano()
+    try:
+        solicitar_acceso(piano, args.camara)
+    finally:
+        piano.cerrar()
 
 
 if __name__ == "__main__":

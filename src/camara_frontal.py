@@ -32,8 +32,8 @@ def calcular_marcas(imagen):
             break
         if key == ord("r"):                # R para repetir
             puntos.clear()
-        if key == 27:                     # Esc para cancelar
-            cv2.destroyWindow("Marcas")
+        if key == 27 or cv2.getWindowProperty("Marcas", cv2.WND_PROP_VISIBLE) < 1:
+            cv2.destroyAllWindows()
             return None, None
 
     cv2.destroyWindow("Marcas")
