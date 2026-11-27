@@ -51,7 +51,17 @@ class CamaraFrontal:
         self.threashold = 100
         self.mp = mp
         self.invertir_manos = invertir_manos
-        self.marcas = calcular_marcas(imagen)
+        p1, p2 = calcular_marcas(imagen)
+
+        margen = 10
+
+        if p1 is not None and p2 is not None:
+            self.marcas = (
+                (min(p1[0], p2[0]), min(p1[1], p2[1]) - margen),
+                (max(p1[0], p2[0]), max(p1[1], p2[1]) + margen)
+            )
+        else:
+            self.marcas = None
         
         vision = mp.tasks.vision
         opciones = vision.HandLandmarkerOptions(
